@@ -2,6 +2,8 @@ import logging
 
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from aiogram import Router
 from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.filters import CommandStart, Command
@@ -73,3 +75,37 @@ async def cmd_stop(message: Message):
         f"You have been unsubscribed from notifications.",
         reply_markup=ReplyKeyboardRemove(),
     )
+
+
+@router.message(Command("write_me"))
+async def cmd_write_me(message: Message, db: AsyncSession):
+    #TODO: clean up test code
+    if not message.from_user:
+        await message.answer("❗️ Error: User data not found.")
+        return
+
+    from_user = message.from_user
+    user_id = from_user.id
+    from sqlalchemy import select
+    from bot.models.user import UserDB
+
+    result = await db.execute(select(UserDB).where(UserDB.id == user_id))
+    user = result.scalar_one_or_none()
+    if user:
+        await message.answer(
+            f"Hello, {message.from_user.full_name}!\n"
+            f"Your ID: {user_id}\n"
+            f"You can write to me directly.",
+        )
+    else:
+        user = UserDB(
+            id=user_id,
+            username=from_user.username,
+            first_name=from_user.first_name,
+            last_name=from_user.last_name,
+            language_code=from_user.language_code,
+        )
+        db.add(user)
+        await db.commit()
+        logging.info(f"User {user_id} registered in the database.")
+        await message.answer("You have been registered in the database. You`r id is: " + str(user_id))
