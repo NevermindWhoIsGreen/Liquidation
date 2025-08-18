@@ -1,4 +1,4 @@
-from sqlalchemy.orm import declarative_base
+from .base_class import Base
+from bot.models.user import UserDB
 
-Base = declarative_base()
-metadata = Base.metadata
+__all__ = ["Base", "UserDB"]

@@ -6,7 +6,6 @@ from typing import Any
 
 from aiogram.types import LinkPreviewOptions
 
-from bot.handlers.base import users
 
 
 MIN_USDT = 1000
@@ -33,7 +32,7 @@ async def process_liquidation(bot: Bot, order: dict[str, Any]):
             f"🔗 Линк: https://www.binance.com/uk-UA/futures/{symbol}\n"
         )
         options_1 = LinkPreviewOptions(is_disabled=True)
-        for user in users:
+        for user in []:
             try:
                 # if TRASH_COINS_ONLY and price < 1:
                 await bot.send_message(user["id"], text, link_preview_options=options_1)
