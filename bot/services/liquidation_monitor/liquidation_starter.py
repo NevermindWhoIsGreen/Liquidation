@@ -38,7 +38,7 @@ async def process_liquidation(bot: Bot, order: dict[str, Any]):
     text = (
         f"💥 Liquidation!\n"
         f"📌 {symbol} | {explanation}\n"
-        f"💰 Volume: {usd_value:,.0f} USDT\n"
+        f"💰 Amount: {usd_value:,.0f} USDT\n"
         f"💵 Price: {price}\n"
         f"🔗 Link: https://www.binance.com/uk-UA/futures/{symbol}\n"
     )

@@ -1,8 +1,8 @@
-"""create_users_and_liquid_settings
+"""create user and lmsettings tables
 
-Revision ID: 003b3ff92dc0
+Revision ID: e6c7db8c80bb
 Revises: 
-Create Date: 2025-08-23 16:44:36.684114
+Create Date: 2025-08-24 15:26:48.840831
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '003b3ff92dc0'
+revision: str = 'e6c7db8c80bb'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -39,7 +39,7 @@ def upgrade() -> None:
     sa.Column('threshold', sa.Float(), nullable=False),
     sa.Column('exchange', sa.String(length=64), nullable=True),
     sa.Column('pairs', sa.JSON(), nullable=False),
-    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ),
+    sa.ForeignKeyConstraint(['user_id'], ['user.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###

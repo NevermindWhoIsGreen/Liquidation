@@ -27,5 +27,8 @@ class UserDB(Base):
     )
 
     liquid_monitor_settings: Mapped["LiquidMonitorSettingsDB"] = relationship(
-        back_populates="user"
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+        single_parent=True,
     )

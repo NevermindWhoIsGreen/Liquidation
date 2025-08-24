@@ -1,6 +1,7 @@
 from sqlalchemy import update, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.exceptions.exceptions import NotFoundError
 from bot.models.liquid_monitor_settings import LiquidMonitorSettingsDB
 from bot.CRUD.base import CRUDBase
 from bot.schemas.liquidation_settings import (
@@ -28,7 +29,7 @@ class LiquidSettingsCRUD(
         ).values(enabled=turn_on).returning(self.model)
         settings = await db.scalar(stmt)
         if not settings:
-            raise Exception(f"No settings for user_id: {user_id}")
+            raise NotFoundError(f"No settings for user_id: {user_id}")
         return settings
 
 
