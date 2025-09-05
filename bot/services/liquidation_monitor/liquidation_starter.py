@@ -1,3 +1,4 @@
+import asyncio
 import websockets
 import json
 
@@ -18,42 +19,121 @@ async def get_active_liq_settings() -> list[LiquidMonitorSettingsDB]:
         ))
 
 
-async def process_liquidation(bot: Bot, order: dict[str, Any]):
-
-    symbol: str = order["o"]["s"]
-    side = order["o"]["S"]  # BUY / SELL
-    price = float(order["o"]["ap"])
-    quantity = float(order["o"]["q"])
+async def process_liquidation(bot: Bot, source: str, info: dict[str, Any]):
+    symbol = info["symbol"]
+    price = float(info["price"])
+    quantity = float(info["quantity"])
     usd_value = price * quantity
 
-    # TODO: fix bottleneck
     settings = await get_active_liq_settings()
-    user_ids = [setting.user_id for setting in settings if price >= setting.threshold and symbol in setting.pairs]
+    user_ids = [
+        s.user_id for s in settings if usd_value >= s.threshold and symbol in s.pairs and source.lower() == s.exchange.lower()
+    ]
+
+    if not user_ids:
+        return
 
     explanation = "❓ Unknown liquidation type"
-    if side == "BUY":
+    if info.get("side") == "BUY":
         explanation = "🚀 Short liquidation (market went up)"
-    elif side == "SELL":
+    elif info.get("side") == "SELL":
         explanation = "📉 Long liquidation (market went down)"
+
     text = (
-        f"💥 Liquidation!\n"
+        f"💥 Liquidation [{source}]\n"
         f"📌 {symbol} | {explanation}\n"
         f"💰 Amount: {usd_value:,.0f} USDT\n"
         f"💵 Price: {price}\n"
-        f"🔗 Link: https://www.binance.com/uk-UA/futures/{symbol}\n"
+        f"{info.get('link', '')}"
     )
     options_1 = LinkPreviewOptions(is_disabled=True)
     for user_id in user_ids:
         try:
             await bot.send_message(user_id, text, link_preview_options=options_1)
         except Exception as e:
-            print(f"Error sending message to subscriber {user_id}: {e}")
+            print(f"Error sending message to {user_id}: {e}")
 
 
-async def start_handler(bot: Bot) -> None:
+# ----------------------
+# Binance Listener
+async def binance_listener(bot: Bot):
     url = "wss://fstream.binance.com/ws/!forceOrder@arr"
     async with websockets.connect(url) as ws:
-        print("✅ Connect to Binance WS")
+        print("Connected to Binance")
         async for msg in ws:
-            order: dict[str, Any] = json.loads(msg)
-            await process_liquidation(bot, order)
+            data = json.loads(msg)
+            await process_liquidation(
+                bot,
+                "Binance",
+                {
+                    "symbol": data["o"]["s"],
+                    "side": data["o"]["S"],
+                    "price": data["o"]["ap"],
+                    "quantity": data["o"]["q"],
+                    "link": f"https://www.binance.com/uk-UA/futures/{data['o']['s']}",
+                },
+            )
+
+
+# ----------------------
+# BitMEX Listener
+async def bitmex_listener(bot: Bot):
+    url = "wss://www.bitmex.com/realtime?subscribe=liquidation"
+    async with websockets.connect(url) as ws:
+        print("Connected to BitMEX")
+        async for msg in ws:
+            data = json.loads(msg)
+            if "data" in data:
+                for order in data["data"]:
+                    await process_liquidation(
+                        bot,
+                        "BitMEX",
+                        {
+                            "symbol": order["symbol"],
+                            "side": order["side"],
+                            "price": order["price"],
+                            "quantity": order.get("leavesQty", 0),
+                        },
+                    )
+
+
+# ----------------------
+# OKX Listener
+async def okx_listener(bot: Bot):
+    url = "wss://ws.okx.com:8443/ws/v5/public"
+    async with websockets.connect(url) as ws:
+        print("Connected to OKX")
+        await ws.send(
+            json.dumps(
+                {
+                    "op": "subscribe",
+                    "args": [
+                        {
+                            "channel": "liquidation-orders",
+                            "instType": "FUTURES",
+                        }
+                    ],
+                }
+            )
+        )
+        async for msg in ws:
+            data = json.loads(msg)
+            for entry in data.get("data", []):
+                await process_liquidation(
+                    bot,
+                    "OKX",
+                    {
+                        "symbol": entry["instId"],
+                        "side": entry["side"],
+                        "price": entry["p"],
+                        "quantity": entry["sz"],
+                    },
+                )
+
+
+async def start_handler(bot: Bot):
+    await asyncio.gather(
+        binance_listener(bot),
+        bitmex_listener(bot),
+        okx_listener(bot),
+    )

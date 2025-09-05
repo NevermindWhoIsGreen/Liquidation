@@ -1,5 +1,5 @@
 from typing import Protocol, Any
-from sqlalchemy.orm import joinedload
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiogram.types import (
@@ -44,6 +44,8 @@ def exchange_kb():
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="Binance", callback_data="exchange:binance")],
+            [InlineKeyboardButton(text="OKX", callback_data="exchange:okx")],
+            [InlineKeyboardButton(text="BitMEX", callback_data="exchange:bitmex")],
         ]
     )
 
@@ -90,7 +92,7 @@ def pairs_kb():
 # --- Handlers ---
 @router.message(F.text == "/setup_lm")
 async def cmd_set_monitor(message: Message, state: FSMContext):
-    await message.answer("Выберите биржу:", reply_markup=exchange_kb())
+    await message.answer("Select exchange:", reply_markup=exchange_kb())
     await state.set_state(MonitorSettings.waiting_for_exchange)
 
 
@@ -101,7 +103,7 @@ async def process_exchange(callback: TypeLMSCallback, state: FSMContext):
     _, exchange = callback.data.split(":")
     await state.update_data(exchange=exchange)
     await callback.message.edit_text(
-        "Выберите минимальную цену ликвидации:", reply_markup=threshold_kb()
+        "Select minimum liquidation price:", reply_markup=threshold_kb()
     )
     await state.set_state(MonitorSettings.waiting_for_threshold)
 
@@ -112,12 +114,12 @@ async def process_exchange(callback: TypeLMSCallback, state: FSMContext):
 async def process_threshold(callback: TypeLMSCallback, state: FSMContext):
     _, value = callback.data.split(":")
     if value == "custom":
-        await callback.message.answer("Введите минимальную цену ликвидации вручную:")
+        await callback.message.answer("Enter the minimum liquidation price manually:")
         await state.set_state(MonitorSettings.waiting_for_custom_threshold)
         return
 
     await state.update_data(threshold=float(value))
-    await callback.message.edit_text("Выберите пары:", reply_markup=pairs_kb())
+    await callback.message.edit_text("Select pairs:", reply_markup=pairs_kb())
     await state.set_state(MonitorSettings.waiting_for_pairs)
 
 
@@ -126,11 +128,11 @@ async def process_custom_threshold(message: Message, state: FSMContext):
     try:
         threshold = float(message.text or 0)
     except ValueError:
-        await message.answer("Введите число:")
+        await message.answer("Please enter a number:")
         return
 
     await state.update_data(threshold=threshold)
-    await message.answer("Выберите пары:", reply_markup=pairs_kb())
+    await message.answer("Select pairs:", reply_markup=pairs_kb())
     await state.set_state(MonitorSettings.waiting_for_pairs)
 
 
@@ -142,13 +144,13 @@ async def process_pair(callback: TypeLMSCallback, state: FSMContext):
     if pair not in pairs:
         pairs.append(pair)
     await state.update_data(pairs=pairs)
-    await callback.answer(f"Добавлено: {pair}")
+    await callback.answer(f"Added: {pair}")
 
 
 @router.callback_query(MonitorSettings.waiting_for_pairs, F.data == "pairs:custom")
 async def process_custom_pairs(callback: TypeLMSCallback, state: FSMContext):
     await callback.message.answer(
-        "Введите список пар через запятую (например: BTCUSDT, ETHUSDT):"
+        "Enter the list of pairs separated by commas (e.g.: BTCUSDT, ETHUSDT):"
     )
     await state.set_state(MonitorSettings.waiting_for_custom_pairs)
 
@@ -159,7 +161,7 @@ async def process_custom_pairs_input(message: Message, state: FSMContext):
     pairs = [p.upper() for p in raw_pairs.split(",") if p]
     await state.update_data(pairs=pairs)
     await message.answer(
-        "✅ Пары сохранены! Если хотите добавить ещё — используйте кнопки ниже.",
+        "✅ Pairs saved! If you want to add more, use the buttons below.",
         reply_markup=pairs_kb(),
     )
     await state.set_state(MonitorSettings.waiting_for_pairs)
@@ -211,13 +213,13 @@ async def cmd_set_threshold(message: Message, db: AsyncSession, user_db: UserDB)
     parts = (message.text or "").split(maxsplit=1)
     if len(parts) < 2:
         return await message.answer(
-            "❗ Введите цену после команды. Пример: /set_threshold 30000"
+            "❗ Enter the threshold after the command. Example: /set_threshold 30000"
         )
 
     try:
         new_threshold = float(parts[1])
     except ValueError:
-        return await message.answer("❗ Неверный формат. Нужно число.")
+        return await message.answer("❗ Invalid format. A number is required.")
 
     await db.refresh(user_db, ("liquid_monitor_settings",))
     settings = user_db.liquid_monitor_settings
@@ -226,7 +228,7 @@ async def cmd_set_threshold(message: Message, db: AsyncSession, user_db: UserDB)
 
     settings.threshold = new_threshold
     await db.commit()
-    await message.answer(f"✅ Порог ликвидации обновлён: {new_threshold}")
+    await message.answer(f"✅ Liquidation threshold updated: {new_threshold}")
 
 
 @router.message(Command("set_pairs"))
@@ -234,10 +236,10 @@ async def cmd_set_pairs(message: Message, db: AsyncSession, user_db: UserDB):
     parts = (message.text or "").split(maxsplit=1)
     if len(parts) < 2:
         return await message.answer(
-            "❗ Укажите пары через пробел. Пример: /set_pairs BTCUSDT ETHUSDT"
+            "❗ Specify pairs separated by spaces. Example: /set_pairs BTCUSDT, ETHUSDT"
         )
 
-    pairs = parts[1].upper().split()
+    pairs = parts[1].upper().replace(" ", "").split(",")
     await db.refresh(user_db, ("liquid_monitor_settings",))
     settings = user_db.liquid_monitor_settings
     if not settings:
@@ -245,7 +247,7 @@ async def cmd_set_pairs(message: Message, db: AsyncSession, user_db: UserDB):
 
     settings.pairs = pairs
     await db.commit()
-    return await message.answer(f"✅ Список пар обновлён: {', '.join(pairs)}")
+    return await message.answer(f"✅ Pairs list updated: {', '.join(pairs)}")
 
 
 @router.message(Command("show_lm_settings"))

@@ -34,9 +34,14 @@ async def cmd_help(message: Message, user: User):
     help_text = as_marked_section(
         Bold("Help"),
         "Available commands:",
-        " /start — " + "start the bot",
-        " /help — " + "show this help",
-        " /settings — " + "configure preferences",
+        " /start - start the bot",
+        " /stop - stop the bot and clean up all data",
+        " /setup_lm - start setting up liquidation monitor settings",
+        " /start_lm & /stop_lm - start/stop the liquidation monitor",
+        " /set_threshold - set the minimum liquidation amount",
+        " /set_pairs - set trading pairs",
+        " /show_lm_settings - check liquidation monitor settings",
+        " /drop_lm_settings - delete liquidation monitor settings",
         marker="• ",
     )
 

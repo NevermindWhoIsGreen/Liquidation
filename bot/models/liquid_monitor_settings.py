@@ -28,7 +28,7 @@ class LiquidMonitorSettingsDB(Base):
         onupdate=func.now(),
     )
     threshold: Mapped[float] = mapped_column(default=0.0)
-    exchange: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    exchange: Mapped[str] = mapped_column(String(64))
     pairs: Mapped[list[str]] = mapped_column(JSON)
 
     user: Mapped["UserDB"] = relationship(back_populates="liquid_monitor_settings", uselist=False)
