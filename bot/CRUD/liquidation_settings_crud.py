@@ -30,6 +30,7 @@ class LiquidSettingsCRUD(
         settings = await db.scalar(stmt)
         if not settings:
             raise NotFoundError(f"No settings for user_id: {user_id}")
+        await db.commit()
         return settings
 
 

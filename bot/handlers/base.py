@@ -25,7 +25,8 @@ async def cmd_start(message: Message, db: AsyncSession, user: User):
         f"Hello, {user.full_name}!\n"
         f"Your ID: {user_db.id}\n"
         f"This bot is created to monitor user liquidations on exchanges (Binance).\n"
-        f"For more detailed information, please use the /help command.",
+        f"For more detailed information, please use the /help command.\n",
+        f"Please use /help command for more information\n",
     )
 
 
