@@ -1,5 +1,6 @@
 import asyncio
 import websockets
+from websockets.exceptions import ConnectionClosedError
 import json
 
 from typing import Any
@@ -79,22 +80,30 @@ async def binance_listener(bot: Bot):
 # BitMEX Listener
 async def bitmex_listener(bot: Bot):
     url = "wss://www.bitmex.com/realtime?subscribe=liquidation"
-    async with websockets.connect(url) as ws:
-        print("Connected to BitMEX")
-        async for msg in ws:
-            data = json.loads(msg)
-            if "data" in data:
-                for order in data["data"]:
-                    await process_liquidation(
-                        bot,
-                        "BitMEX",
-                        {
-                            "symbol": order["symbol"],
-                            "side": order["side"],
-                            "price": order["price"],
-                            "quantity": order.get("leavesQty", 0),
-                        },
-                    )
+    while True:
+        try:
+            async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
+                print("Connected to BitMEX")
+                async for msg in ws:
+                    data = json.loads(msg)
+                    if "data" in data:
+                        for order in data["data"]:
+                            await process_liquidation(
+                                bot,
+                                "BitMEX",
+                                {
+                                    "symbol": order["symbol"],
+                                    "side": order["side"],
+                                    "price": order["price"],
+                                    "quantity": order.get("leavesQty", 0),
+                                },
+                            )
+        except ConnectionClosedError as e:
+            print(f"BitMEX WS closed: {e}, reconnecting in 5s...")
+            await asyncio.sleep(5)
+        except Exception as e:
+            print(f"BitMEX error: {e}, reconnecting in 5s...")
+            await asyncio.sleep(5)
 
 
 # ----------------------
